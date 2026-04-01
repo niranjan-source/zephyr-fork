@@ -46,6 +46,13 @@ struct lpc84x_clock_data {
 		(CLOCK_Select(CLK_MUX_DEFINE(FCLKSEL[inst], \
 			UART_CLK_MUX_SEL(n)));))
 
+#define SPI_CLK_MUX_SEL(n) DT_ENUM_IDX_OR(n, clock_source, 0)
+
+#define SPI_CLK_SELECT(n, inst)                                                                    \
+	IF_ENABLED(DT_NODE_HAS_STATUS(n, okay),					\
+			(CLOCK_Select(CLK_MUX_DEFINE(FCLKSEL[inst + 9],		\
+						     SPI_CLK_MUX_SEL(n)));))
+
 static int lpc84x_clock_control_on(const struct device *dev, clock_control_subsys_t sub_system)
 {
 	struct lpc84x_clock_data *data = dev->data;
@@ -69,6 +76,13 @@ static int lpc84x_clock_control_on(const struct device *dev, clock_control_subsy
 	case LPC84X_CLK_UART4:
 		UART_CLK_SELECT(DT_NODELABEL(uart4), 4);
 		break;
+	case LPC84X_CLK_SPI0:
+		SPI_CLK_SELECT(DT_NODELABEL(spi0), 0);
+		break;
+	case LPC84X_CLK_SPI1:
+		SPI_CLK_SELECT(DT_NODELABEL(spi1), 1);
+		break;
+
 	default:
 		break;
 	}
@@ -94,6 +108,24 @@ static int lpc84x_clock_control_off(const struct device *dev, clock_control_subs
 	return 0;
 }
 
+static uint32_t lpc84x_get_spi_clk_freq(uint8_t fclksel_idx)
+{
+	switch (SYSCON->FCLKSEL[fclksel_idx]) {
+	case 0U:
+		return CLOCK_GetFroFreq();
+	case 1U:
+		return CLOCK_GetMainClkFreq();
+	case 2U:
+		return CLOCK_GetFRG0ClkFreq();
+	case 3U:
+		return CLOCK_GetFRG1ClkFreq();
+	case 4U:
+		return CLOCK_GetFroFreq() >> 1U;
+	default:
+		return 0U;
+	}
+}
+
 static int lpc84x_clock_control_get_rate(const struct device *dev,
 					 clock_control_subsys_t sub_system, uint32_t *rate)
 {
@@ -116,6 +148,12 @@ static int lpc84x_clock_control_get_rate(const struct device *dev,
 		break;
 	case LPC84X_CLK_UART4:
 		*rate = CLOCK_GetUart4ClkFreq();
+		break;
+	case LPC84X_CLK_SPI0:
+		*rate = lpc84x_get_spi_clk_freq(9);
+		break;
+	case LPC84X_CLK_SPI1:
+		*rate = lpc84x_get_spi_clk_freq(10);
 		break;
 	default:
 		return -ENOTSUP;
